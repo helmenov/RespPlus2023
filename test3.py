@@ -5,14 +5,11 @@ import pyqtgraph as pg
 from PyQt6 import QtCore, QtWidgets
 from time import perf_counter
 
-# マイクからの入力ストリームを作成
-stream = sd.InputStream(samplerate=44100, channels=1)
-stream.start()
 
 # ガイドメロディーの音階と周波数の対応表
 notes = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
 freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
-freqs = [frq/2 for frq in freqs]
+#freqs = [frq/2 for frq in freqs]
 
 # ガイドメロディーの音階と時間の対応表（適当に設定）
 melody = ["C4", "E4", "G4", "C5", "G4", "E4", "C4"]
@@ -39,14 +36,14 @@ graph = pg.PlotWidget()
 graph.setLabel("left", "周波数", "Hz")
 graph.setLabel("bottom", "時間", "s")
 graph.setXRange(0, 10) # x軸の範囲を0から10秒に設定
-graph.setYRange(0, 1000) # y軸の範囲を0から1000Hzに設定
+graph.setYRange(0, 1000) # y軸の範囲を0から1000kHzに設定
 layout.addWidget(graph)
 
 # ガイドメロディーのプロット
 guide = graph.plot(melody_times, melody_freqs, pen="g")
 
 # 入力音声のプロット
-input = graph.plot(pen="c")
+mic = graph.plot(pen="c")
 
 # 採点結果のラベル
 score = QtWidgets.QLabel("採点結果：")
@@ -83,8 +80,8 @@ def analyze():
     print(max_freq)
 
     # 入力音声の周波数と時間をプロットに追加
-    input_freqs = input.yData
-    input_times = input.xData
+    input_freqs = mic.yData
+    input_times = mic.xData
     if input_times is None:
         input_freqs = np.array([max_freq])
         input_times = np.array([t])
@@ -97,7 +94,7 @@ def analyze():
     input_times = input_times[input_times > t - 10]
 
     # 入力音声のプロットを更新
-    input.setData(input_times, input_freqs)
+    mic.setData(input_times, input_freqs)
 
     # ガイドメロディーの現在の周波数を求める
     guide_freq = np.interp(t, melody_times, melody_freqs)
@@ -113,11 +110,18 @@ def analyze():
 
     t += timer.interval()/1000
 
-# タイマーを作成し、音声解析と採点の関数を定期的に呼び出す
-timer = QtCore.QTimer()
-timer.timeout.connect(analyze)
-timer.start(100) # 100ミリ秒ごとに呼び出す
-
-# アプリケーションを実行
 window.show()
-sys.exit(app.exec())
+name = input('名前を入力してください')
+if name:
+    # タイマーを作成し、音声解析と採点の関数を定期的に呼び出す
+    timer = QtCore.QTimer()
+    timer.timeout.connect(analyze)
+    timer.start(100) # 100ミリ秒ごとに呼び出す
+
+    # マイクからの入力ストリームを作成
+    stream = sd.InputStream(samplerate=44100, channels=1)
+    stream.start()
+
+    # アプリケーションを実行
+    #window.show()
+    sys.exit(app.exec())
