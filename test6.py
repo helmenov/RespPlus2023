@@ -4,13 +4,15 @@ import sounddevice as sd
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtWidgets
 from time import perf_counter
+import pandas as pd
 
-
+df = pd.read_csv('pattern.csv')
+melody_noteperiod = df.values.tolist()
 # ガイドメロディーの音階と時間の対応表（適当に設定）
-melody_noteperiod = [["In", 4],
-          ["Out", 3],
-          ["In", 3],
-          ["Out", 4]]
+#melody_noteperiod = [["In", 4],
+#          ["Out", 3],
+#          ["In", 3],
+#          ["Out", 4]]
 t = 0
 q = 0
 maxq = 50
@@ -51,7 +53,7 @@ window.setLayout(layout)
 
 # グラフウィジェットの作成
 graph = pg.PlotWidget()
-graph.setLabel("left", "呼吸量", "")
+graph.setLabel("left", "呼吸パターン", "")
 graph.setLabel("bottom", "時間", "s")
 graph.showGrid(x=True,y=False,alpha=0.5)
 #graph.setXRange(0, 10) # x軸の範囲を0から10秒に設定
@@ -73,9 +75,11 @@ t = 0
 score_ = 0
 in_crms = 0
 silence = 0
+rest_crms = None
+weight = 0
 # 音声解析と採点の関数
 def analyze():
-    global t, score_, in_crms, silence
+    global t, score_, in_crms, silence, rest_crms, weight
     # 入力音声のデータを取得
     data = stream.read(stream.read_available)[0]
     if len(data) == 0:
@@ -92,8 +96,12 @@ def analyze():
         timer.stop()
         return
 
-    if guide_q[int(np.round(t*1000))] < 1e-3:
+    if guide_q[int(np.round(t*1000))] < (1e-3):
+        score_ += int(weight*100*np.exp(-in_crms))
+        score.setText(f'採点結果: {score_}点')
         in_crms = 0
+    if guide_q[int(np.round(t*1000))] > maxq - (1e-3):
+        weight = in_crms
 
     if guide_n[int(np.round(t*1000))] == "In":
         in_crms += 10*in_rms
@@ -120,6 +128,8 @@ def analyze():
 
     # 入力音声のプロットを更新
     mic.setData(input_times, input_crms)
+
+
 
     t += timer.interval()/1000
 
