@@ -6,17 +6,27 @@ from PyQt6 import QtCore, QtWidgets
 from time import perf_counter
 
 
-# ガイドメロディーの音階と周波数の対応表
-notes = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
-freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
-#freqs = [frq/2 for frq in freqs]
+# ガイドの呼・吸のRMS
+notes = ["In", "Out"]
+rms = [-30, -10]
 
 # ガイドメロディーの音階と時間の対応表（適当に設定）
-melody = ["C4", "E4", "G4", "C5", "G4", "E4", "C4"]
-times = [0, 1, 2, 3, 4, 5, 6]
+melody_notetime = [["In", 4],
+          ["Out", 3],
+          ["In", 3],
+          ["Out", 4]]
+melody = list()
+times = list()
+time = 0
+for note,dulation in melody_notetime:
+    melody.append(note)
+    times.append(time)
+    time += dulation
+    melody.append(note)
+    times.append(time)        
 
 # ガイドメロディーの周波数と時間の配列に変換
-melody_freqs = np.array([freqs[notes.index(note)] for note in melody])
+melody_rms = np.array([rms[notes.index(note)] for note in melody])
 melody_times = np.array(times)
 
 # アプリケーションの作成
@@ -33,14 +43,14 @@ window.setLayout(layout)
 
 # グラフウィジェットの作成
 graph = pg.PlotWidget()
-graph.setLabel("left", "周波数", "Hz")
+graph.setLabel("left", "音圧レベル", "dB")
 graph.setLabel("bottom", "時間", "s")
-graph.setXRange(0, 10) # x軸の範囲を0から10秒に設定
-graph.setYRange(0, 1000) # y軸の範囲を0から1000kHzに設定
+#graph.setXRange(0, 10) # x軸の範囲を0から10秒に設定
+graph.setYRange(-40, 0) # y軸の範囲を0から1000kHzに設定
 layout.addWidget(graph)
 
 # ガイドメロディーのプロット
-guide = graph.plot(melody_times, melody_freqs, pen="g")
+guide = graph.plot(melody_times, melody_rms, pen="g")
 
 # 入力音声のプロット
 mic = graph.plot(pen="c")
@@ -51,9 +61,11 @@ score = QtWidgets.QLabel("採点結果：")
 layout.addWidget(score)
 
 t = 0
+score_ = 0
+rms0 = 1
 # 音声解析と採点の関数
 def analyze():
-    global t
+    global t, score_
     # 入力音声のデータを取得
     data = stream.read(stream.read_available)[0]
     if len(data) == 0:
@@ -62,51 +74,43 @@ def analyze():
         timer.stop()
 
     data = data.reshape(-1)
-    win = np.hamming(len(data)+1)[:len(data)]
-    data = data * win
+    #win = np.hamming(len(data)+1)[:len(data)]
+    #data = data * win
 
-    # 現在の時間を取得
-    #t = pg.ptime.time()
+    in_rms = np.sqrt(np.mean(data ** 2))
+    in_rms = 20 * np.log10(in_rms/rms0) # RMS in [dB]
 
-    # 高速フーリエ変換で周波数成分を求める
-    freq = np.fft.rfft(data)[:int(len(data)//2)]
-    freq = np.abs(freq) # 振幅スペクトルに変換
-
-    # 周波数軸の値を求める
-    f = np.fft.rfftfreq(len(data), d=1.0/44100)
-
-    # 最大振幅の周波数を求める
-    max_freq = f[np.argmax(freq)]
-    print(max_freq)
-
-    # 入力音声の周波数と時間をプロットに追加
-    input_freqs = mic.yData
+    # 入力音声のRMSと時間をプロットに追加
+    input_rms = mic.yData
     input_times = mic.xData
     if input_times is None:
-        input_freqs = np.array([max_freq])
+        input_rms = np.array([in_rms])
         input_times = np.array([t])
     else:
-        input_freqs = np.append(input_freqs, max_freq)
+        if len(input_rms) > 2:
+            input_rms[-1] = np.mean([input_rms[-2],in_rms]) 
+        input_rms = np.append(input_rms, in_rms)
         input_times = np.append(input_times, t)
 
     # 古いデータを削除する
-    input_freqs = input_freqs[input_times > t - 10]
-    input_times = input_times[input_times > t - 10]
+    #input_rms = input_rms[input_rms > t - 10]
+    #input_times = input_times[input_times > t - 10]
 
     # 入力音声のプロットを更新
-    mic.setData(input_times, input_freqs)
+    mic.setData(input_times, input_rms)
 
-    # ガイドメロディーの現在の周波数を求める
-    guide_freq = np.interp(t, melody_times, melody_freqs)
+    # ガイドメロディーの現在のRMSを求める
+    guide_rms = np.interp(t, melody_times, melody_rms)
 
     # 入力音声とガイドメロディーの周波数の差を求める
-    diff = np.abs(max_freq - guide_freq)
+    diff = np.abs(in_rms - guide_rms)
 
-    # 差が50Hz以内なら一致と判定し、採点結果を更新
-    if diff < 50:
-        score.setText(f"採点結果：{max_freq:.2f}Hz, {guide_freq:.2f}Hz, 一致！")
+    # 差が10dB以内なら一致と判定し、採点結果を更新
+    if diff < 20:
+        score.setText(f"採点結果：{in_rms:.2f} dB,\t{guide_rms:.2f} dB,\t一致！,\t得点:{score_}")
     else:
-        score.setText(f"採点結果：{max_freq:.2f}Hz, {guide_freq:.2f}Hz, 不一致…")
+        score.setText(f"採点結果：{in_rms:.2f} dB,\t{guide_rms:.2f} dB,\t不一致…,\t得点:{score_}")
+    score_ += 4/(1+np.exp(diff))-1
 
     t += timer.interval()/1000
 
@@ -116,7 +120,7 @@ if name:
     # タイマーを作成し、音声解析と採点の関数を定期的に呼び出す
     timer = QtCore.QTimer()
     timer.timeout.connect(analyze)
-    timer.start(100) # 100ミリ秒ごとに呼び出す
+    timer.start(100) # 1秒ごとに呼び出す
 
     # マイクからの入力ストリームを作成
     stream = sd.InputStream(samplerate=44100, channels=1)
