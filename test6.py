@@ -118,7 +118,7 @@ def analyze():
         input_times = np.array([t])
     else:
         if len(input_crms) > 2:
-            input_crms[-1] = np.mean([input_crms[-2],in_crms]) 
+            input_crms[-1] = np.mean([input_crms[-2],in_crms])
         input_crms = np.append(input_crms, in_crms)
         input_times = np.append(input_times, t)
 
@@ -133,16 +133,22 @@ def analyze():
 
     t += timer.interval()/1000
 
-window.show()
+
+print(sd.query_devices())
+dev_i = int(input(">"))
+dev_o = int(input("<"))
+sd.default.device = [dev_i, dev_o]
+# マイクからの入力ストリームを作成
+stream = sd.InputStream(samplerate=44100, channels=1)
+
 name = input('名前を入力してください')
 if name:
+    window.show()
     # タイマーを作成し、音声解析と採点の関数を定期的に呼び出す
     timer = QtCore.QTimer()
     timer.timeout.connect(analyze)
     timer.start(10) # 10msごとに呼び出す
 
-    # マイクからの入力ストリームを作成
-    stream = sd.InputStream(samplerate=44100, channels=1)
     stream.start()
 
     # アプリケーションを実行

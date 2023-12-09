@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "respplus"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Kotaro SONODA <kotaro1976@gmail.com>"]
 readme = "README.md"
@@ -17,6 +17,7 @@ pyqt6 = "^6.5.2"
 numpy = "^1.23"
 pyaudio = "^0.2.13"
 nuitka = "^1.8.3"
+kivy = "^2.2.1"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -27,4 +28,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-test3 = 'test3:main'
+test6 = 'test6:main'

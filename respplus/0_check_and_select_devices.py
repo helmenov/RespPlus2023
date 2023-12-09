@@ -1,6 +1,7 @@
 #%%
 import sounddevice as dev
 from pprint import pprint as print
+import pandas as pd
 
 #%%
 device_list = dev.query_devices()
